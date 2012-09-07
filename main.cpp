@@ -61,9 +61,10 @@ void DrawNumber(unsigned char* image,int W,int H,double f);
 
 int main()
 {
-    const int WIDTH = 614;
-    const int HEIGHT = 512;
+    const int WIDTH = 614*1.5;
+    const int HEIGHT = 512*1.5;
     unsigned char * image = new unsigned char[HEIGHT*WIDTH*4]; // row,column BGRA
+    float * float_image = new float[HEIGHT*WIDTH*3]; // row,column RGB
     for(int i=0;i<HEIGHT*WIDTH;i++)
         image[i*4+3] = 255; // don't want transparency
     
@@ -88,13 +89,15 @@ int main()
        xmax=1;
        ymin=-1.5;
        ymax=1;
-       speed = 0.01;
+       speed = 0.005;
        max_frames = 4000; // or as high as you like
     }
     else
     {
-        cx=-0.11; cy=0.6557;   // spirally blob
+        //cx=-0.11; cy=0.6557;   // spirally blob
         //cx=-0.8;  cy=0.15;   // whiskery dragon
+        //cx = -0.743643887037151l; cy = 0.131825904205330; // separated whorls
+        cx = 0.0; cy = -0.636;
         xmin=-1.8;
         xmax=1.8;
         ymin=-1.5;
@@ -134,6 +137,7 @@ int main()
                 image[y*WIDTH*4+x*4+0] = b; 
                 image[y*WIDTH*4+x*4+1] = g;
                 image[y*WIDTH*4+x*4+2] = r;
+                float_image[y*WIDTH*3+x*3+0] = float_image[y*WIDTH*3+x*3+1] = float_image[y*WIDTH*3+x*3+2] = 0.0f;
             }
         }
         // show the iteration count (a floating point number!)
@@ -149,7 +153,7 @@ int main()
                 if(!move_set)
                 {
                     // only move a checkerboard
-                    int cb = ((int(WIDTH*(subx-xmin)/(xmax-xmin))/10)%2) ^ ((int(HEIGHT*(suby-ymin)/(ymax-ymin))/10)%2);
+                    int cb = ((int(WIDTH*(subx-xmin)/(xmax-xmin))/30)%2) ^ ((int(HEIGHT*(suby-ymin)/(ymax-ymin))/30)%2);
                     if(cb) continue;
                 }
                 else
@@ -202,13 +206,27 @@ int main()
                 {
                     int ix = int(WIDTH * ( (zx-xmin) / (xmax-xmin) ));
                     int iy = int(HEIGHT * ( (zy-ymin) / (ymax-ymin) ));
-                    int ir = int(image[iy*WIDTH*4+ix*4+2]) + 9;
-                    image[iy*WIDTH*4+ix*4+2] = min(255,max(0,ir));
-                    int ig = int(image[iy*WIDTH*4+ix*4+1]) + 9;
-                    image[iy*WIDTH*4+ix*4+1] = min(255,max(0,ig));
-                    int ib = int(image[iy*WIDTH*4+ix*4+0]) + 9;
-                    image[iy*WIDTH*4+ix*4+0] = min(255,max(0,ib));
+                    float_image[iy*WIDTH*3+ix*3+0] += 1.0f;
+                    float_image[iy*WIDTH*3+ix*3+1] += 1.0f;
+                    float_image[iy*WIDTH*3+ix*3+2] += 1.0f;
                 }
+            }
+        }
+
+        // composite the float image and the background one
+        for(int y=0;y<HEIGHT;y++)
+        {
+            for(int x=0;x<WIDTH;x++)
+            {
+                float f = float_image[y*WIDTH*3+x*3+0];
+                if(f>0.0f)
+                    f = log(f)*60;
+                int ib = int(image[y*WIDTH*4+x*4+0] + f);
+                image[y*WIDTH*4+x*4+0] = min(255,max(0,ib));
+                int ig = int(image[y*WIDTH*4+x*4+1] + f);
+                image[y*WIDTH*4+x*4+1] = min(255,max(0,ig));
+                int ir = int(image[y*WIDTH*4+x*4+2] + f);
+                image[y*WIDTH*4+x*4+2] = min(255,max(0,ir));
             }
         }
 
