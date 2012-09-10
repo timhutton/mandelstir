@@ -61,8 +61,10 @@ void DrawNumber(unsigned char* image,int W,int H,double f);
 
 int main()
 {
-    const int WIDTH = 614*1.5;
-    const int HEIGHT = 512*1.5;
+    const double aspect = 4.0/3.0;
+    const double scale = 1.5;
+    const int WIDTH = int(512*aspect*scale);
+    const int HEIGHT = int(512*scale);
     unsigned char * image = new unsigned char[HEIGHT*WIDTH*4]; // row,column BGRA
     float * float_image = new float[HEIGHT*WIDTH*3]; // row,column RGB
     for(int i=0;i<HEIGHT*WIDTH;i++)
@@ -70,10 +72,13 @@ int main()
     
     double xmin,xmax,ymin,ymax; // area to explore
 
-    const int max_its = 300;
+    int max_its = 100;
 
-    const bool MSet = true;
-    const bool move_set = true;
+    enum { Mandelbrot, Julia }                      algorithm =     Mandelbrot;
+    enum { All, CircleRadius2, Checkerboard, Set }  source_points = Set;
+    enum { Stirring, Linear }                       interpolation = Linear;
+
+    const double sub = 0.1; // subsample the pixels for better resolution
 
     double speed;
 
@@ -83,21 +88,21 @@ int main()
     double tempx,t;
     int r,g,b;
 
-    if(MSet)
+    if(algorithm==Mandelbrot)
     {
        xmin=-2;
-       xmax=1;
+       xmax=2;
        ymin=-1.5;
-       ymax=1;
+       ymax=1.5;
        speed = 0.005;
        max_frames = 4000; // or as high as you like
     }
     else
     {
-        //cx=-0.11; cy=0.6557;   // spirally blob
+        cx=-0.11; cy=0.6557;   // spirally blob
         //cx=-0.8;  cy=0.15;   // whiskery dragon
         //cx = -0.743643887037151l; cy = 0.131825904205330; // separated whorls
-        cx = 0.0; cy = -0.636;
+        //cx = 0.0; cy = -0.636; // romanesco broccoli
         xmin=-1.8;
         xmax=1.8;
         ymin=-1.5;
@@ -110,6 +115,8 @@ int main()
     {
         cout << "Frame " << frame+1 << " of " << max_frames << "\n";
 
+        double target = frame * speed;
+
         // plot the static background image
         for(int y=0;y<HEIGHT;y++)
         {
@@ -117,7 +124,7 @@ int main()
             {
                 zx = xmin + (xmax-xmin)*(x/double(WIDTH));
                 zy = ymin + (ymax-ymin)*(y/double(HEIGHT));
-                if(MSet) // (else J-Set)
+                if(algorithm == Mandelbrot)
                 {
                     cx = zx;
                     cy = zy;
@@ -141,71 +148,100 @@ int main()
             }
         }
         // show the iteration count (a floating point number!)
-        double target = frame * speed;
         DrawNumber(image,WIDTH,HEIGHT,target);
         int itarget = int(floor(target));
+        t = target - itarget;
         // plot the moving points
-        const double sub = 0.25; // use a higher density of points
         for( double subx = xmin; subx < xmax; subx += sub*(xmax-xmin)/double(WIDTH) )
         {
             for(double suby = ymin; suby < ymax; suby += sub*(ymax-ymin)/double(HEIGHT) )
             {
-                if(!move_set)
+                switch(source_points)
                 {
-                    // only move a checkerboard
-                    int cb = ((int(WIDTH*(subx-xmin)/(xmax-xmin))/30)%2) ^ ((int(HEIGHT*(suby-ymin)/(ymax-ymin))/30)%2);
-                    if(cb) continue;
-                }
-                else
-                {
-                    // does this pixel escape?
-                    zx = subx;
-                    zy = suby;
-                    if(MSet) // (else J-Set)
-                    {
-                        cx = zx;
-                        cy = zy;
-                    }
-                    bool escaped = false;
-                    for(int it=0;it<max_its;it++)
-                    {
-                        tempx = zx*zx - zy*zy + cx;
-                        zy = 2.0*zx*zy + cy;
-                        zx = tempx;
-                        if(zx*zx+zy*zy>4.0)
+                    case All: default:
+                        break;
+                    case CircleRadius2:
+                        if(subx*subx+suby*suby>4.0) continue;
+                        break;
+                    case Checkerboard:
                         {
-                            escaped = true;
-                            break;
+                            if( ((int(WIDTH*(subx-xmin)/(xmax-xmin))/30)%2) ^ ((int(HEIGHT*(suby-ymin)/(ymax-ymin))/30)%2) )
+                                continue;
                         }
-                    }
-                    if(escaped) continue;
+                        break;
+                    case Set:
+                        {
+                            // does this pixel escape?
+                            zx = subx;
+                            zy = suby;
+                            if(algorithm == Mandelbrot)
+                            {
+                                cx = zx;
+                                cy = zy;
+                            }
+                            bool escaped = false;
+                            for(int it=0;it<max_its;it++)
+                            {
+                                tempx = zx*zx - zy*zy + cx;
+                                zy = 2.0*zx*zy + cy;
+                                zx = tempx;
+                                if(zx*zx+zy*zy>4.0)
+                                {
+                                    escaped = true;
+                                    break;
+                                }
+                            }
+                            if(escaped) continue;
+                        }
+                        break;
                 }
                 // find the transformed location
                 zx = subx;
                 zy = suby;
-                if(MSet)
+                if(algorithm == Mandelbrot)
                 {
                     cx = zx;
                     cy = zy;
                 }
-                // perform the integer stages
-                for(int i=0;i<itarget;i++)
+                switch(interpolation)
                 {
-                    tempx = zx*zx - zy*zy + cx;
-                    zy = 2.0*zx*zy + cy;
-                    zx = tempx;
+                    case Linear:
+                    {
+                        double ox=zx,oy=zy; // remember the previous iteration
+                        for(int i=0;i<itarget+1;i++)
+                        {
+                            ox = zx;
+                            oy = zy;
+                            tempx = zx*zx - zy*zy + cx;
+                            zy = 2.0*zx*zy + cy;
+                            zx = tempx;
+                        }
+                        // use linear interpolation on the last jump
+                        zx = ox + (zx-ox)*t;
+                        zy = oy + (zy-oy)*t;
+                    }
+                    break;
+                    case Stirring:
+                    {
+                        // perform the integer stages
+                        for(int i=0;i<itarget;i++)
+                        {
+                            tempx = zx*zx - zy*zy + cx;
+                            zy = 2.0*zx*zy + cy;
+                            zx = tempx;
+                        }
+                        // perform the leftover fractional iterations
+                        ComplexPower(zx,zy,1.0+t);
+                        zx += cx * t;
+                        zy += cy * t;
+                    }
+                    break;
                 }
-                // perform the leftover fractional iterations
-                t = target - itarget;
-                double pt = 1.0 + t;
-                ComplexPower(zx,zy,pt);
-                zx += cx * t;
-                zy += cy * t;
                 // brighten the new location (if on the image)
                 if(zx>xmin && zx<xmax && zy>ymin && zy<ymax)
                 {
-                    int ix = int(WIDTH * ( (zx-xmin) / (xmax-xmin) ));
-                    int iy = int(HEIGHT * ( (zy-ymin) / (ymax-ymin) ));
+                    int ix = int(  WIDTH * (zx-xmin) / (xmax-xmin) );
+                    int iy = int( HEIGHT * (zy-ymin) / (ymax-ymin) );
                     float_image[iy*WIDTH*3+ix*3+0] += 1.0f;
                     float_image[iy*WIDTH*3+ix*3+1] += 1.0f;
                     float_image[iy*WIDTH*3+ix*3+2] += 1.0f;
@@ -220,20 +256,23 @@ int main()
             {
                 float f = float_image[y*WIDTH*3+x*3+0];
                 if(f>0.0f)
-                    f = log(f)*60;
-                int ib = int(image[y*WIDTH*4+x*4+0] + f);
-                image[y*WIDTH*4+x*4+0] = min(255,max(0,ib));
-                int ig = int(image[y*WIDTH*4+x*4+1] + f);
-                image[y*WIDTH*4+x*4+1] = min(255,max(0,ig));
-                int ir = int(image[y*WIDTH*4+x*4+2] + f);
-                image[y*WIDTH*4+x*4+2] = min(255,max(0,ir));
+                {
+                    f = log(log(f))*120;
+                    if(f<0) continue;
+                    int ib = int(image[y*WIDTH*4+x*4+0] + f);
+                    image[y*WIDTH*4+x*4+0] = min(255,max(0,ib));
+                    int ig = int(image[y*WIDTH*4+x*4+1] + f);
+                    image[y*WIDTH*4+x*4+1] = min(255,max(0,ig));
+                    int ir = int(image[y*WIDTH*4+x*4+2] + f);
+                    image[y*WIDTH*4+x*4+2] = min(255,max(0,ir));
+                }
             }
         }
 
         // simple TGA output
         {
             ostringstream filename;
-            filename << "frame_" << frame << ".tga";
+            filename << "linear/frame_" << frame << ".tga";
             ofstream o(filename.str().c_str(), ios::out | ios::binary);
             for(int c=0;c<12;c++) o.put("002000000000"[c]-'0');
             o.put((WIDTH & 0x00FF));
@@ -278,7 +317,7 @@ void DrawChar(unsigned char* image,int W,int H,int &sx,char c)
 void DrawNumber(unsigned char* image,int W,int H,double f)
 {
     ostringstream oss;
-    oss << setprecision(3) << f;
+    oss << f;
     int sx=0;
     for(int iC=0;iC<oss.str().length();iC++)
         DrawChar(image,W,H,sx,oss.str()[iC]);
