@@ -3,8 +3,8 @@ John Baez posted something on Google+: <a href='http://plus.google.com/117663015
 It shows an animation that Anders Kaseorg made in answer to a Quora question about _why_ Julia Sets are fractal.
 
 Here's some more versions of the same idea:<br>
-<a href='http://www.youtube.com/watch?feature=player_embedded&v=AjFkLy5U--I' target='_blank'><img src='http://img.youtube.com/vi/AjFkLy5U--I/0.jpg' width='425' height=344 /></a><br>
-<a href='http://www.youtube.com/watch?feature=player_embedded&v=iznx-trhCmo' target='_blank'><img src='http://img.youtube.com/vi/iznx-trhCmo/0.jpg' width='425' height=344 /></a><br>
+<a href='http://www.youtube.com/watch?feature=player_embedded&v=AjFkLy5U--I' target='_blank'><img src='http://img.youtube.com/vi/AjFkLy5U--I/0.jpg' width='425' height=344 /> video</a><br>
+<a href='http://www.youtube.com/watch?feature=player_embedded&v=iznx-trhCmo' target='_blank'><img src='http://img.youtube.com/vi/iznx-trhCmo/0.jpg' width='425' height=344 /> video</a><br>
 <br>
 The nice thing about this approach is that it <i>explains</i> how the Julia set works. Compare with the <a href='http://en.wikipedia.org/wiki/Iterated_function_system#Examples'>diagrams of the affine transforms in Iterated Function Systems</a>. The key idea in both cases is that the fractal maps onto a smaller version of itself.<br>
 <br>
@@ -12,13 +12,13 @@ The <a href='http://www.clarku.edu/~djoyce/complex/powers.html'>z<sup>2</sup> tr
 <br>
 The obvious thing is to make a similar animation for the Mandelbrot. As John points out, it's not as simple, because the set doesn't map directly onto itself every iteration. But it is still very pleasing!<br>
 <br>
-<a href='http://www.youtube.com/watch?feature=player_embedded&v=dQ7kj2jCUJs' target='_blank'><img src='http://img.youtube.com/vi/dQ7kj2jCUJs/0.jpg' width='425' height=344 /></a><br>
+<a href='http://www.youtube.com/watch?feature=player_embedded&v=dQ7kj2jCUJs' target='_blank'><img src='http://img.youtube.com/vi/dQ7kj2jCUJs/0.jpg' width='425' height=344 /> video</a><br>
 <br>
 Here's the same thing shown on a checkerboard instead of on the set itself. This makes it clearer that it's the transform that gives rise to the shape of the set.<br>
-<a href='http://www.youtube.com/watch?feature=player_embedded&v=8op_yA6vNsw' target='_blank'><img src='http://img.youtube.com/vi/8op_yA6vNsw/0.jpg' width='425' height=344 /></a><br>
+<a href='http://www.youtube.com/watch?feature=player_embedded&v=8op_yA6vNsw' target='_blank'><img src='http://img.youtube.com/vi/8op_yA6vNsw/0.jpg' width='425' height=344 /> video</a><br>
 <br>
 Another way of animating this is to use a simple linear interpolation between each iteration. We lose the mathematical connection to z<sup>2</sup> being a 'stirring' movement but it gives a simpler behavior:<br>
-<a href='http://www.youtube.com/watch?feature=player_embedded&v=mdjrKFI9GRk' target='_blank'><img src='http://img.youtube.com/vi/mdjrKFI9GRk/0.jpg' width='425' height=344 /></a><br>
+<a href='http://www.youtube.com/watch?feature=player_embedded&v=mdjrKFI9GRk' target='_blank'><img src='http://img.youtube.com/vi/mdjrKFI9GRk/0.jpg' width='425' height=344 /> video</a><br>
 <br>
 This the closest I've come so far to the original goal of visualizing <i>how</i> the Mandelbrot works.<br>
 <br>
