@@ -27,12 +27,22 @@ using namespace std;
 
 struct Point {
     double x, y;
+    Point(double x, double y) : x(x), y(y) {}
 };
 
 struct MandelbrotPoint {
     Point c;
     Point z;
     Point prev_z;
+    bool is_in_set;
+
+    MandelbrotPoint(double x, double y)
+        : c(x, y)
+        , z(x, y)
+        , prev_z(0, 0)
+    {
+        is_in_set = isInSet();
+    }
 
     void update()
     {
@@ -44,10 +54,26 @@ struct MandelbrotPoint {
 
     Point getIntermediate(double u) const
     {
-        Point p;
-        p.x = prev_z.x + u * (z.x - prev_z.x);
-        p.y = prev_z.y + u * (z.y - prev_z.y);
-        return p;
+        return Point(prev_z.x + u * (z.x - prev_z.x), prev_z.y + u * (z.y - prev_z.y));
+    }
+
+private:
+
+    bool isInSet(size_t n_iterations = 100) const
+    {
+        double x = c.x;
+        double y = c.y;
+        for(size_t i = 0; i < n_iterations; i++)
+        {
+            double tempx = x * x - y * y + c.x;
+            y = 2 * x * y + c.y;
+            x = tempx;
+            if(x * x + y * y > 4)
+            {
+                return false;
+            }
+        }
+        return true;
     }
 };
 
@@ -68,16 +94,15 @@ void writeTGA(const vector<unsigned char>& char_bgra_image, int width, int heigh
     o.write(reinterpret_cast<const char*>(char_bgra_image.data()), height * width * 4);
 }
 
-void accumulatePoint(double x, double y, vector<float>& float_rgb_image, const Rect& image_range, int width, int height)
+void accumulatePoint(double x, double y, bool is_in_set, vector<float>& float_rgb_image, const Rect& image_range, int width, int height)
 {
     const int ix = static_cast<int>( width * (x - image_range.xmin) / (image_range.xmax - image_range.xmin));
     const int iy = static_cast<int>(height * (y - image_range.ymin) / (image_range.ymax - image_range.ymin));
     if(ix >= 0 && ix < width && iy >= 0 && iy < height)
     {
         const size_t iPixel = iy * width + ix;
-        float_rgb_image[iPixel * 3 + 0] += 1;
-        float_rgb_image[iPixel * 3 + 1] += 1;
-        float_rgb_image[iPixel * 3 + 2] += 1;
+        const size_t iFloat = iPixel * 3 + (is_in_set ? 1 : 0); // green: in set, red: out of set
+        float_rgb_image[iFloat] += 1;
     }
 }
 
@@ -90,8 +115,8 @@ void writePointsToFloatImage(const vector<MandelbrotPoint>& points, double u, ve
         if(p.x * p.x + p.y * p.y < 4)
         {
             // accumulate in both halves since we only track points starting with y > 0
-            accumulatePoint(p.x,  p.y, float_rgb_image, image_range, width, height);
-            accumulatePoint(p.x, -p.y, float_rgb_image, image_range, width, height);
+            accumulatePoint(p.x,  p.y, pt.is_in_set, float_rgb_image, image_range, width, height);
+            accumulatePoint(p.x, -p.y, pt.is_in_set, float_rgb_image, image_range, width, height);
         }
     }
 }
@@ -114,11 +139,8 @@ void writeFloatImageToCharImage(const vector<float>& float_rgb_image, vector<uns
             const size_t iPixel = y * width + x;
             const float r = float_rgb_image[iPixel * 3 + 0];
             const float g = float_rgb_image[iPixel * 3 + 1];
-            const float b = float_rgb_image[iPixel * 3 + 2];
-            char_bgra_image[iPixel * 4 + 0] = scaleFloatToChar(b);
             char_bgra_image[iPixel * 4 + 1] = scaleFloatToChar(g);
             char_bgra_image[iPixel * 4 + 2] = scaleFloatToChar(r);
-            char_bgra_image[iPixel * 4 + 3] = 255;
         }
     }
 }
@@ -134,12 +156,9 @@ void initializeTrackingPoints(vector<MandelbrotPoint>& points, const Rect& sampl
             {
                 continue; // skip points outside the r=2 disk
             }
-            MandelbrotPoint pt;
-            pt.c.x = pt.z.x = x;
-            pt.c.y = pt.z.y = y;
-            pt.prev_z.x = pt.prev_z.y = 0;
             if(points.size() < points.capacity())
             {
+                MandelbrotPoint pt(x, y);
                 points.push_back(pt);
             }
         }
@@ -192,6 +211,28 @@ void drawNumberOnCharImage(vector<unsigned char>& image, int width, int height, 
     }
 }
 
+void writeBackgroundImage(vector<unsigned char>& char_bgra_background_image, int width, int height, const Rect& image_range)
+{
+    for(int y = 0; y < height; y++)
+    {
+        for(int x = 0; x < width; x++)
+        {
+            MandelbrotPoint pt(image_range.xmin + x * (image_range.xmax - image_range.xmin) / width,
+                               image_range.ymin + y * (image_range.ymax - image_range.ymin) / height);
+            const size_t iPixel = y * width + x;
+            char_bgra_background_image[iPixel * 4 + 0] = pt.is_in_set ? 150 : 0; // Mandelbrot set in blue pixel
+            char_bgra_background_image[iPixel * 4 + 1] = 0;
+            char_bgra_background_image[iPixel * 4 + 2] = 0;
+            char_bgra_background_image[iPixel * 4 + 3] = 255; // alpha=255 for opaque
+        }
+    }
+}
+
+void copyBackgroundImageToCharImage(const vector<unsigned char>& char_bgra_background_image, vector<unsigned char>& char_bgra_image)
+{
+    char_bgra_image.assign(char_bgra_background_image.begin(), char_bgra_background_image.end());
+}
+
 void run()
 {
     // define the region that we sample with tracking points (probably don't want to change this)
@@ -212,13 +253,15 @@ void run()
     constexpr int WIDTH = static_cast<int>(HEIGHT * (image_range.xmax - image_range.xmin) / (image_range.ymax - image_range.ymin));
     cout << "Writing into " << WIDTH << " x " << HEIGHT << " image\n";
     vector<float> float_rgb_image(HEIGHT*WIDTH*3); // row,column RGB - we accumulate point counts into this one
+    vector<unsigned char> char_bgra_background_image(HEIGHT*WIDTH*4); // row,column BGRA - this contains a static background image
     vector<unsigned char> char_bgra_image(HEIGHT*WIDTH*4); // row,column BGRA - this contains our final image
 
+    writeBackgroundImage(char_bgra_background_image, WIDTH, HEIGHT, image_range);
     initializeTrackingPoints(points, sample_range, samples_per_unit_length);
 
-    const size_t gigabytes = MAX_POINTS * sizeof(MandelbrotPoint) / (1024 * 1024 * 1024);
     const double million_pts = points.size() / 1e6;
-    cout << "Tracking " << million_pts << " million points. Memory: " << gigabytes << "GB" << std::endl;
+    const size_t gigabytes = MAX_POINTS * sizeof(MandelbrotPoint) / (1024 * 1024 * 1024);
+    cout << "Tracking " << million_pts << " million points. Memory: " << gigabytes << " GB" << endl;
 
     const int n_iterations = 100;
     const int n_sub_iterations = 20;
@@ -230,11 +273,12 @@ void run()
         {
             const double u = iSubIteration / static_cast<double>(n_sub_iterations);
             writePointsToFloatImage(points, u, float_rgb_image, image_range, WIDTH, HEIGHT);
+            copyBackgroundImageToCharImage(char_bgra_background_image, char_bgra_image);
             writeFloatImageToCharImage(float_rgb_image, char_bgra_image, WIDTH, HEIGHT);
             drawNumberOnCharImage(char_bgra_image, WIDTH, HEIGHT, iIteration + u);
             const string filename = getFilename(iFrame++);
             writeTGA(char_bgra_image, WIDTH, HEIGHT, filename);
-            cout << "Iteration " << iIteration + u << " - wrote " << filename << "\n";
+            cout << "Iteration " << iIteration + u << " - wrote " << filename << endl;
         }
     }
 }
@@ -247,12 +291,12 @@ int main()
     }
     catch(const exception& e)
     {
-        cout << "Caught an exception: " << e.what() << "\n";
+        cout << "Caught an exception: " << e.what() << endl;
         return EXIT_FAILURE;
     }
     catch(...)
     {
-        cout << "Caught an unknown exception\n";
+        cout << "Caught an unknown exception" << endl;
         return EXIT_FAILURE;
     }
 
