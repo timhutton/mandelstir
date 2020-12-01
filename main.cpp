@@ -30,6 +30,19 @@ struct Point {
     Point(double x, double y) : x(x), y(y) {}
 };
 
+bool inR2Disk(double x, double y)
+{
+    return x * x + y * y < 4;
+}
+
+bool inBulb1(double x, double y)
+{
+    double cx = -1;
+    double cy = 0;
+    double r = 0.25;
+    return (x - cx) * (x - cx) + (y - cy) * (y - cy) < r * r;
+}
+
 struct MandelbrotPoint {
     Point c;
     Point z;
@@ -68,7 +81,7 @@ private:
             double tempx = x * x - y * y + c.x;
             y = 2 * x * y + c.y;
             x = tempx;
-            if(x * x + y * y > 4)
+            if(!inR2Disk(x,y))
             {
                 return false;
             }
@@ -112,7 +125,7 @@ void writePointsToFloatImage(const vector<MandelbrotPoint>& points, double u, ve
     for(const MandelbrotPoint& pt : points)
     {
         const Point p = pt.getIntermediate(u);
-        if(p.x * p.x + p.y * p.y < 4)
+        if(inR2Disk(p.x, p.y))
         {
             // accumulate in both halves since we only track points starting with y > 0
             accumulatePoint(p.x,  p.y, pt.is_in_set, float_rgb_image, image_range, width, height);
@@ -152,11 +165,7 @@ void initializeTrackingPoints(vector<MandelbrotPoint>& points, const Rect& sampl
     {
         for(double y = sample_range.ymin; y < sample_range.ymax; y += d)
         {
-            if(x * x + y * y > 4)
-            {
-                continue; // skip points outside the r=2 disk
-            }
-            if(points.size() < points.capacity())
+            if(inBulb1(x, y) && points.size() < points.capacity())
             {
                 MandelbrotPoint pt(x, y);
                 points.push_back(pt);
