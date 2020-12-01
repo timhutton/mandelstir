@@ -43,6 +43,15 @@ bool inBulb1(double x, double y)
     return (x - cx) * (x - cx) + (y - cy) * (y - cy) < r * r;
 }
 
+bool inBulb2(double x, double y)
+{
+    // this is only approximate
+    const double cx = -0.1253;
+    const double cy = 0.745;
+    const double r = 0.094;
+    return (x - cx) * (x - cx) + (y - cy) * (y - cy) < r * r;
+}
+
 bool inCardioid(double x, double y)
 {
     const double tx = 0.25 - x;
@@ -129,7 +138,13 @@ void accumulatePoint(double x, double y, bool is_in_set, vector<float>& float_rg
     }
 }
 
-void writePointsToFloatImage(const vector<MandelbrotPoint>& points, double u, vector<float>& float_rgb_image, const Rect& image_range, int width, int height)
+void writePointsToFloatImage(const vector<MandelbrotPoint>& points,
+                             double u,
+                             vector<float>& float_rgb_image,
+                             const Rect& image_range,
+                             int width,
+                             int height,
+                             bool mirror)
 {
     fill(float_rgb_image.begin(), float_rgb_image.end(), 0.0f);
     for(const MandelbrotPoint& pt : points)
@@ -137,9 +152,12 @@ void writePointsToFloatImage(const vector<MandelbrotPoint>& points, double u, ve
         const Point p = pt.getIntermediate(u);
         if(inR2Disk(p.x, p.y))
         {
-            // accumulate in both halves since we only track points starting with y > 0
             accumulatePoint(p.x,  p.y, pt.is_in_set, float_rgb_image, image_range, width, height);
-            accumulatePoint(p.x, -p.y, pt.is_in_set, float_rgb_image, image_range, width, height);
+            if(mirror)
+            {
+                // accumulate in both halves since we only track points starting with y > 0
+                accumulatePoint(p.x, -p.y, pt.is_in_set, float_rgb_image, image_range, width, height);
+            }
         }
     }
 }
@@ -175,7 +193,7 @@ void initializeTrackingPoints(vector<MandelbrotPoint>& points, const Rect& sampl
     {
         for(double y = sample_range.ymin; y < sample_range.ymax; y += d)
         {
-            if(inCardioid(x, y) && points.size() < points.capacity())
+            if(inBulb2(x, y))
             {
                 MandelbrotPoint pt(x, y);
                 points.push_back(pt);
@@ -256,6 +274,7 @@ void run()
 {
     // define the region that we sample with tracking points (probably don't want to change this)
     constexpr Rect sample_range = { -2, 2, 0, 2 }; // (we duplicate the upper half to save compute)
+    constexpr bool mirror = false;
 
     // sample the region at as high a resolution as we can afford
     constexpr size_t samples_per_unit_length = 8000; // samples per unit length on the complex plane
@@ -266,7 +285,7 @@ void run()
     points.reserve(MAX_POINTS);
 
     // define the region that we want to see in the final image (can change this freely)
-    constexpr Rect image_range = { -1.6, 0.7, -0.8, 0.8};
+    constexpr Rect image_range = { -1.4, 0.7, -0.5, 1.1};
 
     // make a destination image to write into
     constexpr int HEIGHT = 1024;
@@ -294,7 +313,7 @@ void run()
         {
             const double u = iSubIteration / static_cast<double>(n_sub_iterations);
             cout << "Iteration " << iIteration + u << " ";
-            writePointsToFloatImage(points, u, float_rgb_image, image_range, WIDTH, HEIGHT);
+            writePointsToFloatImage(points, u, float_rgb_image, image_range, WIDTH, HEIGHT, mirror);
             copyBackgroundImageToCharImage(char_bgra_background_image, char_bgra_image);
             writeFloatImageToCharImage(float_rgb_image, char_bgra_image, WIDTH, HEIGHT);
             drawNumberOnCharImage(char_bgra_image, WIDTH, HEIGHT, iIteration + u);
