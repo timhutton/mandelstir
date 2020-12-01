@@ -37,10 +37,20 @@ bool inR2Disk(double x, double y)
 
 bool inBulb1(double x, double y)
 {
-    double cx = -1;
-    double cy = 0;
-    double r = 0.25;
+    const double cx = -1;
+    const double cy = 0;
+    const double r = 0.25;
     return (x - cx) * (x - cx) + (y - cy) * (y - cy) < r * r;
+}
+
+bool inCardioid(double x, double y)
+{
+    const double tx = 0.25 - x;
+    const double ty = y;
+    const double theta = atan2(ty, tx);
+    const double cr = pow(cos(theta / 2), 2);
+    const double r2 = tx * tx + ty * ty;
+    return r2 < cr * cr;
 }
 
 struct MandelbrotPoint {
@@ -165,7 +175,7 @@ void initializeTrackingPoints(vector<MandelbrotPoint>& points, const Rect& sampl
     {
         for(double y = sample_range.ymin; y < sample_range.ymax; y += d)
         {
-            if(inBulb1(x, y) && points.size() < points.capacity())
+            if(inCardioid(x, y) && points.size() < points.capacity())
             {
                 MandelbrotPoint pt(x, y);
                 points.push_back(pt);
@@ -251,43 +261,46 @@ void run()
     constexpr size_t samples_per_unit_length = 8000; // samples per unit length on the complex plane
     constexpr size_t MAX_POINTS = static_cast<size_t>(samples_per_unit_length * samples_per_unit_length
                                             * (sample_range.ymax - sample_range.ymin) * (sample_range.xmax - sample_range.xmin));
+    const size_t gigabytes = MAX_POINTS * sizeof(MandelbrotPoint) / (1024 * 1024 * 1024);
     vector<MandelbrotPoint> points;
     points.reserve(MAX_POINTS);
 
     // define the region that we want to see in the final image (can change this freely)
-    constexpr Rect image_range = { -1.8, 0.9, -0.8, 1.2};
+    constexpr Rect image_range = { -1.6, 0.7, -0.8, 0.8};
 
     // make a destination image to write into
     constexpr int HEIGHT = 1024;
     constexpr int WIDTH = static_cast<int>(HEIGHT * (image_range.xmax - image_range.xmin) / (image_range.ymax - image_range.ymin));
-    cout << "Writing into " << WIDTH << " x " << HEIGHT << " image\n";
     vector<float> float_rgb_image(HEIGHT*WIDTH*3); // row,column RGB - we accumulate point counts into this one
     vector<unsigned char> char_bgra_background_image(HEIGHT*WIDTH*4); // row,column BGRA - this contains a static background image
     vector<unsigned char> char_bgra_image(HEIGHT*WIDTH*4); // row,column BGRA - this contains our final image
 
+    cout << "Writing the background image..." << endl;
     writeBackgroundImage(char_bgra_background_image, WIDTH, HEIGHT, image_range);
+    cout << "Initializing the tracking points..." << endl;
     initializeTrackingPoints(points, sample_range, samples_per_unit_length);
 
     const double million_pts = points.size() / 1e6;
-    const size_t gigabytes = MAX_POINTS * sizeof(MandelbrotPoint) / (1024 * 1024 * 1024);
-    cout << "Tracking " << million_pts << " million points. Memory: " << gigabytes << " GB" << endl;
+    cout << "Tracking " << million_pts << " million points. (" << gigabytes << " GB)" << endl;
+    cout << "Writing into " << WIDTH << " x " << HEIGHT << " image\n";
 
-    const int n_iterations = 100;
-    const int n_sub_iterations = 20;
-    size_t iFrame = 0;
-    for(size_t iIteration = 0; iIteration <= n_iterations; iIteration++)
+    const int n_iterations = 1000;
+    int iFrame = 0;
+    for(int iIteration = 0; iIteration <= n_iterations; iIteration++)
     {
+        const int n_sub_iterations = max(1, 50 - iIteration);
         updatePoints(points);
-        for(size_t iSubIteration = 0; iSubIteration < n_sub_iterations; iSubIteration++)
+        for(int iSubIteration = 0; iSubIteration < n_sub_iterations; iSubIteration++)
         {
             const double u = iSubIteration / static_cast<double>(n_sub_iterations);
+            cout << "Iteration " << iIteration + u << " ";
             writePointsToFloatImage(points, u, float_rgb_image, image_range, WIDTH, HEIGHT);
             copyBackgroundImageToCharImage(char_bgra_background_image, char_bgra_image);
             writeFloatImageToCharImage(float_rgb_image, char_bgra_image, WIDTH, HEIGHT);
             drawNumberOnCharImage(char_bgra_image, WIDTH, HEIGHT, iIteration + u);
             const string filename = getFilename(iFrame++);
             writeTGA(char_bgra_image, WIDTH, HEIGHT, filename);
-            cout << "Iteration " << iIteration + u << " - wrote " << filename << endl;
+            cout << "Wrote " << filename << endl;
         }
     }
 }
